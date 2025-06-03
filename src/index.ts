@@ -11,6 +11,7 @@ import { sendDiscordMessage } from './discord';
 import type { ApkVersionDetails, DownloadedApkData } from './interfaces/apk';
 import { requestConnection } from './db/connection';
 import { VersionInfoModel, type IVersionInfo } from './db/schemas/versionInfo';
+import AppInfoParser from 'app-info-parser';
 
 const { WEBHOOK_URL, VERSION_DISPLAY_PAGE_URL, APK_DOWNLOAD_API_URL, MONGODB_URI } = process.env;
 
@@ -76,20 +77,27 @@ async function getVersionFromApkManifest(apkFilePath: string): Promise<ApkVersio
     const zip = new AdmZip(apkFilePath);
     const manifestEntry = zip.getEntry('AndroidManifest.xml');
 
-    if (manifestEntry) {
-      const manifestXml = manifestEntry.getData().toString('utf8');
-      const versionCodeMatch = manifestXml.match(/android:versionCode="([^"]+)"/);
-      const versionNameMatch = manifestXml.match(/android:versionName="([^"]+)"/);
+    // caso o arquivo APK não contenha o manifesto esperado
+    // zip.extractAllTo(DOWNLOAD_DIR, true);
+    const parser = new AppInfoParser(apkFilePath); // Passe o caminho do arquivo APK
+    const result = await parser.parse();
 
+    const versionCode = result.versionCode !== undefined && result.versionCode !== null ? String(result.versionCode) : null;
+    const versionName = typeof result.versionName === 'string' ? result.versionName : null;
+
+    if (versionCode || versionName) {
       const details: ApkVersionDetails = {
-        versionCode: versionCodeMatch ? versionCodeMatch[1] : null,
-        versionName: versionNameMatch ? versionNameMatch[1] : null,
+        versionCode: versionCode,
+        versionName: versionName,
       };
-      console.log(`Versão extraída do manifesto do APK ('${path.basename(apkFilePath)}'): Code='${details.versionCode}', Name='${details.versionName}'`);
+      console.log(`Versão extraída do manifesto (app-info-parser): Code='${details}', Name='${details.versionName}'`);
+      // console.log(`Versão extraída do manifesto (app-info-parser): Code='<span class="math-inline">\{details\.versionCode\}', Name\='</span>{details.versionName}'`);
       return details;
     } else {
-      console.warn('AndroidManifest.xml não encontrado no APK.');
+      console.warn('Não foi possível extrair versionCode/versionName do manifesto do APK usando app-info-parser.');
+      return null;
     }
+
   } catch (error: any) {
     console.error(`Erro ao ler o manifesto do APK '${apkFilePath}':`, error.message);
   }
@@ -200,7 +208,9 @@ async function checkAndUpdateApk(): Promise<void> {
 
   const versionToCompareLast = lastVersionInfo?.manifestVersionName || lastVersionInfo?.scrapedVersion;
 
-  if (currentScrapedVersion === versionToCompareLast) {
+  console.log(`Versão raspada atual: ${currentScrapedVersion} | Versão do manifesto: ${lastVersionInfo?.manifestVersionName || 'Nenhuma'} | Versão do DB: ${versionToCompareLast || 'Nenhuma'}`);
+  
+  if (currentScrapedVersion.includes(lastVersionInfo?.manifestVersionName ?? '')) {
     const dateFormattedPtBR = new Date(lastVersionInfo?.updatedAt ?? '').toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: '2-digit',
