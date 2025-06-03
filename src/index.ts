@@ -252,7 +252,28 @@ async function checkAndUpdateApk(): Promise<void> {
 
   await saveCurrentVersionInfo(finalVersionToStore);
   console.log('NOTIFICAÇÃO: Nova versão do APK disponível e baixada!');
-  await sendDiscordMessage(WEBHOOK_URL!, `Nova versão do APK disponível: ${finalVersionToStore.filename}\nVersão raspada: ${finalVersionToStore.scrapedVersion}\nVersão do manifesto: ${finalVersionToStore.manifestVersionName || 'N/A'}\nBaixado em: ${finalVersionToStore.downloadedAt}`);
+  await sendDiscordMessage(WEBHOOK_URL!, `Nova versão do APK disponível: ${finalVersionToStore.filename}\nBaixado em: ${finalVersionToStore.downloadedAt}`, [
+    {
+      name: 'Versão raspada',
+      value: finalVersionToStore.scrapedVersion || 'Nenhuma',
+      inline: true
+    },
+    {
+      name: 'Versão do manifesto',
+      value: finalVersionToStore.manifestVersionName || 'Nenhuma',
+      inline: true
+    },
+    {
+      name: 'Versão do manifesto (código)',
+      value: finalVersionToStore.manifestVersionCode || 'Nenhum',
+      inline: true
+    },
+    {
+      name: 'Arquivo baixado',
+      value: finalVersionToStore.filename || 'Nenhum',
+      inline: true
+    }
+  ]);
 
   if (!KEEP_DOWNLOADED_APK) {
     if (apkPathForCleanup && await pathExists(apkPathForCleanup)) {
