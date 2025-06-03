@@ -29,7 +29,6 @@ jobs:
         with:
           name: last-version-info
           path: ${{ github.workspace }}
-          if-no-files-found: ignore
 
       - name: Run script
         run: bun dist/index.js
