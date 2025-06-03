@@ -24,6 +24,13 @@ jobs:
       - name: Build project
         run: bun run build
 
+      - name: Download last version info
+        uses: actions/download-artifact@v4
+        with:
+          name: last-version-info
+          path: ${{ github.workspace }}
+          if-no-files-found: error
+
       - name: Run script
         run: bun dist/index.js
         env:
