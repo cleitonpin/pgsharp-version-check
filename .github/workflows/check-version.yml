@@ -1,0 +1,32 @@
+name: Check Version and Notify of PGSharp
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.43
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build project
+        run: bun run build
+
+      - name: Run script
+        run: bun dist/index.js
+        env:
+          WEBHOOK_URL_CONFIGURADA: ${{ secrets.WEBHOOK_URL_SECRET }}
+          VERSION_DISPLAY_PAGE_URL: ${{ secrets.VERSION_DISPLAY_PAGE_URL }}
+          APK_DOWNLOAD_API_URL: ${{ secrets.APK_DOWNLOAD_API_URL }}

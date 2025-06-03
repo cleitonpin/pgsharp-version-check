@@ -1,0 +1,23 @@
+{
+  "name": "check-v",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node --external puppeteer --external axios --external adm-zip --external dotenv",
+    "start": "bun run build && bun run dist/index.js",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "axios": "^1.9.0",
+    "dotenv": "^16.5.0",
+    "puppeteer": "^24.10.0"
+  }
+}
