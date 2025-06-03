@@ -5,6 +5,7 @@
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target node --external puppeteer --external axios --external adm-zip --external dotenv",
     "start": "bun run build && bun run dist/index.js",
+    "dev": "bun src/index.ts",
     "test": "bun test"
   },
   "devDependencies": {

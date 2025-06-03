@@ -20,8 +20,8 @@ if (!WEBHOOK_URL || !VERSION_DISPLAY_PAGE_URL || !APK_DOWNLOAD_API_URL) {
 const KEEP_DOWNLOADED_APK: boolean = false;
 const VERSION_SELECTOR_ON_PAGE: string = '#content > div > div > div > div > section.elementor-section.elementor-top-section.elementor-element.elementor-element-46f376a.elementor-section-boxed.elementor-section-height-default.elementor-section-height-default > div > div > div > div > div > div.elementor-element.elementor-element-d81c5e0.elementor-widget.elementor-widget-text-editor > div > div > p:nth-child(1) > span:nth-child(2)'; 
 
-const DOWNLOAD_DIR: string = path.join(__dirname, 'downloads');
-const VERSION_FILE: string = path.join(__dirname, 'last_checked_version.json');
+const DOWNLOAD_DIR: string = path.join(process.cwd(), 'downloads');
+const VERSION_FILE: string = path.join(process.cwd(), 'last_checked_version.json');
 const APK_BASENAME: string = 'apk_pgsharp'; 
 
 async function pathExists(filePath: string): Promise<boolean> {

@@ -30,3 +30,11 @@ jobs:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
           VERSION_DISPLAY_PAGE_URL: ${{ secrets.VERSION_DISPLAY_PAGE_URL }}
           APK_DOWNLOAD_API_URL: ${{ secrets.APK_DOWNLOAD_API_URL }}
+
+      - name: Upload current version info artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-version-info
+          path: ${{ github.workspace }}/last_checked_version.json
+          retention-days: 90
