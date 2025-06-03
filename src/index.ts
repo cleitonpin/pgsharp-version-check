@@ -178,6 +178,32 @@ async function checkAndUpdateApk(): Promise<void> {
   }
   
   if (currentScrapedVersion === lastVersionInfo.scrapedVersion || currentScrapedVersion === lastVersionInfo.manifestVersionName) {
+    const dateFormattedPtBR = new Date(lastVersionInfo.updatedAt ?? '').toLocaleDateString('pt-BR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'America/Sao_Paulo',
+    });
+    await sendDiscordMessage(WEBHOOK_URL!, `Nenhuma nova versão do APK detectada. Versão atual: ${currentScrapedVersion}.`, [
+      {
+        name: 'Última verificação',
+        value: dateFormattedPtBR,
+        inline: true
+      },
+      {
+        name: 'Versão raspada',
+        value: lastVersionInfo.scrapedVersion || 'Nenhuma',
+        inline: true
+      },
+      {
+        name: 'Versão do manifesto',
+        value: lastVersionInfo.manifestVersionName || 'Nenhuma',
+        inline: true
+      }
+    ]);
     console.log(`Versão da página (${currentScrapedVersion}) é a mesma da última verificação. Nenhuma ação necessária.`);
     return;
   }
