@@ -159,20 +159,20 @@ async function loadLastVersionInfoFromDB() {
   } catch (error: any) {
     console.error('Erro ao carregar informações da última versão do DB:', error.message);
   }
-  return null; // Retorna null se não encontrar ou se houver erro
+  return null;
 }
 
 async function saveCurrentVersionInfoToDB(info: Omit<IVersionInfo, keyof Document | 'sourceIdentifier'> & { sourceIdentifier?: string }): Promise<void> {
   const dataToSave = {
     ...info,
-    sourceIdentifier: APK_SOURCE_IDENTIFIER, // Garante o identificador
-    downloadedAt: new Date() // Garante a data atual
+    sourceIdentifier: APK_SOURCE_IDENTIFIER,
+    downloadedAt: new Date()
   };
   try {
     await VersionInfoModel.findOneAndUpdate(
       { sourceIdentifier: APK_SOURCE_IDENTIFIER },
       dataToSave,
-      { upsert: true, new: true, setDefaultsOnInsert: true } // upsert: cria se não existir
+      { upsert: true, new: true, setDefaultsOnInsert: true } 
     );
     console.log('Informações da versão atual salvas no DB:', {
       scrapedVersion: dataToSave.scrapedVersion,
