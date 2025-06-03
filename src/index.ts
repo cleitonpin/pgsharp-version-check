@@ -8,20 +8,21 @@ import puppeteer, { Browser, Page } from 'puppeteer';
 import AdmZip from 'adm-zip';
 import * as fsSync from 'fs';
 import { sendDiscordMessage } from './discord';
-import type { ApkVersionDetails, DownloadedApkData, VersionInfo } from './interfaces/apk';
+import type { ApkVersionDetails, DownloadedApkData } from './interfaces/apk';
+import { requestConnection } from './db/connection';
+import { VersionInfoModel, type IVersionInfo } from './db/schemas/versionInfo';
 
-const { WEBHOOK_URL, VERSION_DISPLAY_PAGE_URL, APK_DOWNLOAD_API_URL } = process.env;
+const { WEBHOOK_URL, VERSION_DISPLAY_PAGE_URL, APK_DOWNLOAD_API_URL, MONGODB_URI } = process.env;
 
-if (!WEBHOOK_URL || !VERSION_DISPLAY_PAGE_URL || !APK_DOWNLOAD_API_URL) {
+if (!WEBHOOK_URL || !VERSION_DISPLAY_PAGE_URL || !APK_DOWNLOAD_API_URL || !MONGODB_URI) {
   console.error('Erro: Variáveis de ambiente WEBHOOK_URL, VERSION_DISPLAY_PAGE_URL e APK_DOWNLOAD_API_URL devem ser definidas.');
   process.exit(1);
 }
 
 const KEEP_DOWNLOADED_APK: boolean = false;
 const VERSION_SELECTOR_ON_PAGE: string = '#content > div > div > div > div > section.elementor-section.elementor-top-section.elementor-element.elementor-element-46f376a.elementor-section-boxed.elementor-section-height-default.elementor-section-height-default > div > div > div > div > div > div.elementor-element.elementor-element-d81c5e0.elementor-widget.elementor-widget-text-editor > div > div > p:nth-child(1) > span:nth-child(2)'; 
-
+const APK_SOURCE_IDENTIFIER = 'pgsharp_apk_check'
 const DOWNLOAD_DIR: string = path.join(process.cwd(), 'downloads');
-const VERSION_FILE: string = path.join(process.cwd(), 'last_checked_version.json');
 const APK_BASENAME: string = 'apk_pgsharp'; 
 
 async function pathExists(filePath: string): Promise<boolean> {
@@ -143,42 +144,64 @@ async function downloadApkFromApi(apiUrl: string, desiredFilename: string): Prom
   }
 }
 
-async function loadLastVersionInfo(): Promise<VersionInfo> {
+async function loadLastVersionInfoFromDB() {
   try {
-    if (await pathExists(VERSION_FILE)) {
-      const fileContent = await fs.readFile(VERSION_FILE, 'utf-8');
-      return JSON.parse(fileContent) as VersionInfo;
+    const lastInfo = await VersionInfoModel.findOne({ sourceIdentifier: APK_SOURCE_IDENTIFIER }).lean();
+    if (lastInfo) {
+      console.log('Última versão carregada do DB:', {
+        scrapedVersion: lastInfo.scrapedVersion,
+        manifestVersionName: lastInfo.manifestVersionName,
+        downloadedAt: lastInfo.downloadedAt,
+      });
+      return lastInfo;
     }
+    console.log('Nenhuma informação de versão encontrada no DB para o identificador:', APK_SOURCE_IDENTIFIER);
   } catch (error: any) {
-    console.error('Erro ao carregar informações da última versão:', error.message);
+    console.error('Erro ao carregar informações da última versão do DB:', error.message);
   }
-  return { scrapedVersion: null, manifestVersionName: null, manifestVersionCode: null, filename: null };
+  return null; // Retorna null se não encontrar ou se houver erro
 }
 
-async function saveCurrentVersionInfo(info: VersionInfo): Promise<void> {
+async function saveCurrentVersionInfoToDB(info: Omit<IVersionInfo, keyof Document | 'sourceIdentifier'> & { sourceIdentifier?: string }): Promise<void> {
+  const dataToSave = {
+    ...info,
+    sourceIdentifier: APK_SOURCE_IDENTIFIER, // Garante o identificador
+    downloadedAt: new Date() // Garante a data atual
+  };
   try {
-    await fs.writeFile(VERSION_FILE, JSON.stringify(info, null, 2), 'utf-8');
-    console.log('Informações da versão atual salvas:', info);
+    await VersionInfoModel.findOneAndUpdate(
+      { sourceIdentifier: APK_SOURCE_IDENTIFIER },
+      dataToSave,
+      { upsert: true, new: true, setDefaultsOnInsert: true } // upsert: cria se não existir
+    );
+    console.log('Informações da versão atual salvas no DB:', {
+      scrapedVersion: dataToSave.scrapedVersion,
+      manifestVersionName: dataToSave.manifestVersionName
+    });
   } catch (error: any) {
-    console.error('Erro ao salvar informações da versão atual:', error.message);
+    console.error('Erro ao salvar informações da versão atual no DB:', error.message);
   }
 }
 
 async function checkAndUpdateApk(): Promise<void> {
+  await requestConnection(process.env.MONGODB_URI!)
   console.log(`\n[${new Date().toISOString()}] Iniciando verificação de nova versão do APK...`);
 
-  const lastVersionInfo = await loadLastVersionInfo();
-  console.log('Última versão registrada:', lastVersionInfo);
+  const lastVersionInfo = await loadLastVersionInfoFromDB();
 
-  const currentScrapedVersion = await getVersionFromPageWithPuppeteer(VERSION_DISPLAY_PAGE_URL!, VERSION_SELECTOR_ON_PAGE);
+  const currentScrapedVersion = await getVersionFromPageWithPuppeteer(process.env.VERSION_DISPLAY_PAGE_URL!, VERSION_SELECTOR_ON_PAGE);
+
+  console.log('Última versão registrada:', lastVersionInfo);
 
   if (!currentScrapedVersion) {
     console.error('Não foi possível obter a versão da página. Abortando verificação.');
     return;
   }
-  
-  if (currentScrapedVersion === lastVersionInfo.scrapedVersion || currentScrapedVersion === lastVersionInfo.manifestVersionName) {
-    const dateFormattedPtBR = new Date(lastVersionInfo.updatedAt ?? '').toLocaleDateString('pt-BR', {
+
+  const versionToCompareLast = lastVersionInfo?.manifestVersionName || lastVersionInfo?.scrapedVersion;
+
+  if (currentScrapedVersion === versionToCompareLast) {
+    const dateFormattedPtBR = new Date(lastVersionInfo?.updatedAt ?? '').toLocaleDateString('pt-BR', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -195,12 +218,12 @@ async function checkAndUpdateApk(): Promise<void> {
       },
       {
         name: 'Versão raspada',
-        value: lastVersionInfo.scrapedVersion || 'Nenhuma',
+        value: lastVersionInfo?.scrapedVersion || 'Nenhuma',
         inline: true
       },
       {
         name: 'Versão do manifesto',
-        value: lastVersionInfo.manifestVersionName || 'Nenhuma',
+        value: lastVersionInfo?.manifestVersionName || 'Nenhuma',
         inline: true
       }
     ]);
@@ -208,7 +231,8 @@ async function checkAndUpdateApk(): Promise<void> {
     return;
   }
 
-  console.log(`Nova versão detectada na página: ${currentScrapedVersion} (anterior registrada: ${lastVersionInfo.scrapedVersion || lastVersionInfo.manifestVersionName || 'Nenhuma'})`);
+
+  console.log(`Nova versão detectada na página: ${currentScrapedVersion} (anterior registrada: ${lastVersionInfo?.scrapedVersion || lastVersionInfo?.manifestVersionName || 'Nenhuma'})`);
 
   const proposedFilename = `${currentScrapedVersion.replace(/[^a-zA-Z0-9.-]/g, '_')}.apk`; 
   const downloadedApkData = await downloadApkFromApi(APK_DOWNLOAD_API_URL!, proposedFilename);
@@ -220,75 +244,48 @@ async function checkAndUpdateApk(): Promise<void> {
 
   const manifestVersionDetails = await getVersionFromApkManifest(downloadedApkData.filePath);
 
-  let finalVersionToStore: VersionInfo = {
+  const currentInfoToSave: Partial<IVersionInfo> = {
     scrapedVersion: currentScrapedVersion,
-    manifestVersionName: manifestVersionDetails?.versionName || null,
-    manifestVersionCode: manifestVersionDetails?.versionCode || null,
+    manifestVersionName: manifestVersionDetails?.versionName,
+    manifestVersionCode: manifestVersionDetails?.versionCode,
     filename: downloadedApkData.determinedFilename,
-    filePath: downloadedApkData.filePath,
-    downloadedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(), 
   };
 
-  let apkPathForCleanup = downloadedApkData.filePath; 
+  await saveCurrentVersionInfoToDB(currentInfoToSave as any);
 
-  if (manifestVersionDetails?.versionName && manifestVersionDetails.versionName !== currentScrapedVersion) {
-    console.warn(`Versão do manifesto (${manifestVersionDetails.versionName}) difere da raspada (${currentScrapedVersion}).`);
-    const manifestBasedFilename = `${APK_BASENAME}-v${manifestVersionDetails.versionName.replace(/[^a-zA-Z0-9.-]/g, '_')}.apk`;
-    const newFinalPath = path.join(DOWNLOAD_DIR, manifestBasedFilename);
-    if (downloadedApkData.filePath !== newFinalPath) {
-      try {
-        if (await pathExists(newFinalPath)) await fs.unlink(newFinalPath);
-        await fs.rename(downloadedApkData.filePath, newFinalPath);
-        console.log(`Arquivo renomeado para usar versão do manifesto: ${manifestBasedFilename}`);
-        finalVersionToStore.filename = manifestBasedFilename;
-        finalVersionToStore.filePath = newFinalPath;
-        apkPathForCleanup = newFinalPath; 
-      } catch (renameError: any) {
-        console.error(`Erro ao renomear arquivo com base na versão do manifesto: ${renameError.message}`);
-      }
-    }
-  }
-
-  await saveCurrentVersionInfo(finalVersionToStore);
   console.log('NOTIFICAÇÃO: Nova versão do APK disponível e baixada!');
-  await sendDiscordMessage(WEBHOOK_URL!, `Nova versão do APK disponível: ${finalVersionToStore.filename}\nBaixado em: ${finalVersionToStore.downloadedAt}`, [
+
+  await sendDiscordMessage(WEBHOOK_URL!, `Nova versão do APK disponível: ${currentInfoToSave.filename}\nBaixado em: ${currentInfoToSave.downloadedAt}`, [
     {
       name: 'Versão raspada',
-      value: finalVersionToStore.scrapedVersion || 'Nenhuma',
+      value: currentInfoToSave.scrapedVersion || 'Nenhuma',
       inline: true
     },
     {
       name: 'Versão do manifesto',
-      value: finalVersionToStore.manifestVersionName || 'Nenhuma',
+      value: currentInfoToSave.manifestVersionName || 'Nenhuma',
       inline: true
     },
     {
       name: 'Versão do manifesto (código)',
-      value: finalVersionToStore.manifestVersionCode || 'Nenhum',
+      value: currentInfoToSave.manifestVersionCode || 'Nenhum',
       inline: true
     },
     {
       name: 'Arquivo baixado',
-      value: finalVersionToStore.filename || 'Nenhum',
+      value: currentInfoToSave.filename || 'Nenhum',
       inline: true
     }
   ]);
 
-  if (!KEEP_DOWNLOADED_APK) {
-    if (apkPathForCleanup && await pathExists(apkPathForCleanup)) {
+ if (!KEEP_DOWNLOADED_APK && await pathExists(downloadedApkData.filePath)) { // fs.pathExists é de fs-extra, se usar fs nativo, adapte
       try {
-        await fs.unlink(apkPathForCleanup);
-        console.log(`APK baixado (${path.basename(apkPathForCleanup)}) foi removido para economizar espaço.`);
-        
-        await saveCurrentVersionInfo(finalVersionToStore); 
+        await fs.unlink(downloadedApkData.filePath); // Para fs nativo: await fs.promises.unlink(...)
+        console.log(`APK baixado (${path.basename(downloadedApkData.filePath)}) foi removido.`);
       } catch (cleanupError: any) {
-        console.error(`Erro ao remover o APK baixado ${apkPathForCleanup}:`, cleanupError.message);
+        console.error(`Erro ao remover APK: ${cleanupError.message}`);
       }
     }
-  } else {
-    console.log(`APK baixado (${path.basename(apkPathForCleanup)}) foi mantido em: ${apkPathForCleanup}`);
-  }
   
 }
 
