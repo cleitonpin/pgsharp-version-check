@@ -231,7 +231,6 @@ async function checkAndUpdateApk(): Promise<void> {
     return;
   }
 
-
   console.log(`Nova versão detectada na página: ${currentScrapedVersion} (anterior registrada: ${lastVersionInfo?.scrapedVersion || lastVersionInfo?.manifestVersionName || 'Nenhuma'})`);
 
   const proposedFilename = `${currentScrapedVersion.replace(/[^a-zA-Z0-9.-]/g, '_')}.apk`; 
@@ -278,14 +277,14 @@ async function checkAndUpdateApk(): Promise<void> {
     }
   ]);
 
- if (!KEEP_DOWNLOADED_APK && await pathExists(downloadedApkData.filePath)) { // fs.pathExists é de fs-extra, se usar fs nativo, adapte
-      try {
-        await fs.unlink(downloadedApkData.filePath); // Para fs nativo: await fs.promises.unlink(...)
-        console.log(`APK baixado (${path.basename(downloadedApkData.filePath)}) foi removido.`);
-      } catch (cleanupError: any) {
-        console.error(`Erro ao remover APK: ${cleanupError.message}`);
-      }
+  if (!KEEP_DOWNLOADED_APK && await pathExists(downloadedApkData.filePath)) {
+    try {
+      await fs.unlink(downloadedApkData.filePath); 
+      console.log(`APK baixado (${path.basename(downloadedApkData.filePath)}) foi removido.`);
+    } catch (cleanupError: any) {
+      console.error(`Erro ao remover APK: ${cleanupError.message}`);
     }
+  }
   
 }
 
