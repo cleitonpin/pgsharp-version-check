@@ -30,7 +30,8 @@ jobs:
         with:
           name: last-version-info
           path: ${{ github.workspace }}
-
+          run-id: ${{ github.event.workflow_run.id || github.run_id }}
+          
       - name: Run script
         run: bun dist/index.js
         env:
