@@ -31,4 +31,5 @@ jobs:
           VERSION_DISPLAY_PAGE_URL: ${{ secrets.VERSION_DISPLAY_PAGE_URL }}
           APK_DOWNLOAD_API_URL: ${{ secrets.APK_DOWNLOAD_API_URL }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
 

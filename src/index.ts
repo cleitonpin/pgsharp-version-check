@@ -199,8 +199,6 @@ async function checkAndUpdateApk(): Promise<void> {
 
   const currentScrapedVersion = await getVersionFromPageWithPuppeteer(process.env.VERSION_DISPLAY_PAGE_URL!, VERSION_SELECTOR_ON_PAGE);
 
-  console.log('Última versão registrada:', lastVersionInfo);
-
   if (!currentScrapedVersion) {
     console.error('Não foi possível obter a versão da página. Abortando verificação.');
     return;
@@ -302,9 +300,7 @@ console.log('Serviço de verificação de APK (com Puppeteer e análise de manif
 
 (async () => {
   try {
-    console.log("Executando teste inicial...");
     await checkAndUpdateApk();
-    console.log("Teste inicial concluído.");
   } catch (error) {
     console.error("Erro na execução inicial de teste:", error);
   }
