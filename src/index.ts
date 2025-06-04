@@ -236,6 +236,7 @@ async function checkAndUpdateApk(): Promise<void> {
       }
     ]);
     console.log(`Versão da página (${currentScrapedVersion}) é a mesma da última verificação. Nenhuma ação necessária.`);
+
     return;
   }
 
@@ -301,6 +302,7 @@ console.log('Serviço de verificação de APK (com Puppeteer e análise de manif
 (async () => {
   try {
     await checkAndUpdateApk();
+    process.exit(0);
   } catch (error) {
     console.error("Erro na execução inicial de teste:", error);
   }

@@ -3,7 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node --external puppeteer --external axios --external adm-zip --external dotenv",
+    "build": "bun build src/index.ts --outdir dist --target node --external puppeteer --external axios --external adm-zip --external dotenv --external app-info-parser",
     "start": "bun run build && bun run dist/index.js",
     "dev": "bun src/index.ts",
     "test": "bun test"
