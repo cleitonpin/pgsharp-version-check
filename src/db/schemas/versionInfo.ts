@@ -7,7 +7,7 @@ interface IVersionInfo extends Document {
   manifestVersionName?: string | null;
   manifestVersionCode?: string | null;
   filename?: string | null;
-  downloadedAt: Date;
+  downloadedAt: string | Date;
   createdAt?: Date;
   updatedAt?: Date;
 }

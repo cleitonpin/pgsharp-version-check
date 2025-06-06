@@ -5,7 +5,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import { Writable } from 'stream';
 import puppeteer, { Browser, Page } from 'puppeteer';
-import AdmZip from 'adm-zip';
 import * as fsSync from 'fs';
 import { sendDiscordMessage } from './discord';
 import type { ApkVersionDetails, DownloadedApkData } from './interfaces/apk';
@@ -74,13 +73,17 @@ async function getVersionFromApkManifest(apkFilePath: string): Promise<ApkVersio
       console.warn(`Arquivo APK não encontrado em: ${apkFilePath} para extração de manifesto.`);
       return null;
     }
-    const zip = new AdmZip(apkFilePath);
-    const manifestEntry = zip.getEntry('AndroidManifest.xml');
+    // const zip = new AdmZip(apkFilePath);
+    // const manifestEntry = zip.getEntry('AndroidManifest.xml');
 
     // caso o arquivo APK não contenha o manifesto esperado
     // zip.extractAllTo(DOWNLOAD_DIR, true);
     const parser = new AppInfoParser(apkFilePath); // Passe o caminho do arquivo APK
     const result = await parser.parse();
+
+    // console.log({result})
+    // await fs.writeFile(path.join(DOWNLOAD_DIR, 'AndroidManifest.json'),result, 'utf8');
+    // console.log(`Manifesto do APK extraído com sucesso de: ${apkFilePath}`);
 
     const versionCode = result.versionCode !== undefined && result.versionCode !== null ? String(result.versionCode) : null;
     const versionName = typeof result.versionName === 'string' ? result.versionName : null;
@@ -204,39 +207,12 @@ async function checkAndUpdateApk(): Promise<void> {
     return;
   }
 
-  const versionToCompareLast = lastVersionInfo?.manifestVersionName || lastVersionInfo?.scrapedVersion;
+  const versionToCompareLast = lastVersionInfo?.scrapedVersion;
 
   console.log(`Versão raspada atual: ${currentScrapedVersion} | Versão do manifesto: ${lastVersionInfo?.manifestVersionName || 'Nenhuma'} | Versão do DB: ${versionToCompareLast || 'Nenhuma'}`);
   
-  if (currentScrapedVersion.includes(lastVersionInfo?.manifestVersionName ?? '')) {
-    const dateFormattedPtBR = new Date(lastVersionInfo?.updatedAt ?? '').toLocaleDateString('pt-BR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZone: 'America/Sao_Paulo',
-    });
-    await sendDiscordMessage(WEBHOOK_URL!, `Nenhuma nova versão do APK detectada. Versão atual: ${currentScrapedVersion}.`, [
-      {
-        name: 'Última verificação',
-        value: dateFormattedPtBR,
-        inline: true
-      },
-      {
-        name: 'Versão raspada',
-        value: lastVersionInfo?.scrapedVersion || 'Nenhuma',
-        inline: true
-      },
-      {
-        name: 'Versão do manifesto',
-        value: lastVersionInfo?.manifestVersionName || 'Nenhuma',
-        inline: true
-      }
-    ]);
-    console.log(`Versão da página (${currentScrapedVersion}) é a mesma da última verificação. Nenhuma ação necessária.`);
-
+  if (currentScrapedVersion === versionToCompareLast) {
+    console.log('Nenhuma nova versão detectada. Abortando verificação.');
     return;
   }
 
@@ -257,6 +233,15 @@ async function checkAndUpdateApk(): Promise<void> {
     manifestVersionName: manifestVersionDetails?.versionName,
     manifestVersionCode: manifestVersionDetails?.versionCode,
     filename: downloadedApkData.determinedFilename,
+    downloadedAt: new Date().toLocaleDateString('pt-BR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'America/Sao_Paulo'
+    })
   };
 
   await saveCurrentVersionInfoToDB(currentInfoToSave as any);
