@@ -246,7 +246,7 @@ async function checkAndUpdateApk(): Promise<void> {
 
   await saveCurrentVersionInfoToDB(currentInfoToSave as any);
 
-  console.log('NOTIFICAÇÃO: Nova versão do APK disponível e baixada!');
+  console.log('NOTIFICAÇÃO: Nova versão do APK disponível e baixadaX!');
 
   await sendDiscordMessage(WEBHOOK_URL!, `Nova versão do APK disponível: ${currentInfoToSave.filename}\nBaixado em: ${currentInfoToSave.downloadedAt}`, [
     {
